@@ -5,7 +5,7 @@ from domain.entity.base import BaseEntity
 
 @dataclass(kw_only=True)
 class IgnoredMessage(BaseEntity):
-    id: str | None = None
+    id: int | None = None
     text: str
 
     @classmethod

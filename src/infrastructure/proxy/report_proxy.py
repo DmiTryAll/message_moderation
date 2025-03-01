@@ -20,3 +20,4 @@ class ReportProxy(ABCReportProxy):
             chat_id=self.chat_id,
             text=f"Повторяющееся сообщение:\n\n{text}\n\nОт пользователя: {owner_id}"
         )
+        return True

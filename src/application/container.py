@@ -4,19 +4,19 @@ from aiogram import Bot
 from aiojobs import Scheduler
 from motor.motor_asyncio import AsyncIOMotorClient
 from punq import Container, Scope
-from redis.asyncio import Redis
 
 from domain.repositories.ignored_messages import ABCIgnoredMessagesRepository
 from domain.repositories.messages import ABCMessagesRepository
+from domain.repositories.skiped_messages import ABCSkipedMessagesRepository
 from domain.services.message_moderation import MessageModerationService
 from domain.utils.progress_counter_storage import ProgressCounterStorage
-from domain.utils.skiped_message_ids_storage import SkipedMessageIdsStorage
 
 from infrastructure.proxy.report_proxy import ABCReportProxy, ReportProxy
 from infrastructure.repositories.mongo.messages import MongoDBMessagesRepository
-from infrastructure.repositories.redis.ignored_messages import RedisIgnoredMessagesRepository
-from infrastructure.utils.progress_counter_storage import ProgressCounterRedisStorage
-from infrastructure.utils.skiped_message_ids_storage import SkipedMessageIdsRedisStorage
+from infrastructure.repositories.postgres.database import Database
+from infrastructure.repositories.postgres.ignored_messages import PosgresIgnoredMessagesRepository
+from infrastructure.repositories.postgres.skiped_messages import PosgresSkipedMessagesRepository
+from infrastructure.utils.progress_counter_storage import ProgressCounterFileStorage
 
 from settings.main import Config
 
@@ -38,13 +38,15 @@ def _init_container() -> Container:
             serverSelectionTimeoutMS=3000,
         )
     
-    def create_redis_client():
-        return Redis.from_url(config.redis.url)
+    def create_postgres_db():
+        return Database(
+            config.postgres.url
+        )
     
     container.register(AsyncIOMotorClient, factory=create_mongodb_client, scope=Scope.singleton)
-    container.register(Redis, factory=create_redis_client, scope=Scope.singleton)
-    
-    redis_client = container.resolve(Redis)
+    container.register(Database, factory=create_postgres_db, scope=Scope.singleton)
+
+    database = container.resolve(Database)
     mongodb_client = container.resolve(AsyncIOMotorClient)
 
     def init_messages_mongodb_repository() -> MongoDBMessagesRepository:
@@ -54,10 +56,14 @@ def _init_container() -> Container:
             mongodb_collection_name=config.mongodb.messages_collection,
         )
     
-    def init_ignored_messages_redis_repository() -> RedisIgnoredMessagesRepository:
-        return RedisIgnoredMessagesRepository(
-            client=redis_client,
-            prefix="ignored_messages",
+    def init_ignored_messages_postgres_repository() -> PosgresIgnoredMessagesRepository:
+        return PosgresIgnoredMessagesRepository(
+            database=database
+        )
+    
+    def init_skiped_messages_postgres_repository() -> PosgresSkipedMessagesRepository:
+        return PosgresSkipedMessagesRepository(
+            database=database
         )
 
     # register repositiries
@@ -68,29 +74,24 @@ def _init_container() -> Container:
     )
     container.register(
         ABCIgnoredMessagesRepository,
-        factory=init_ignored_messages_redis_repository,
+        factory=init_ignored_messages_postgres_repository,
+        scope=Scope.singleton
+    )
+    container.register(
+        ABCSkipedMessagesRepository,
+        factory=init_skiped_messages_postgres_repository,
         scope=Scope.singleton
     )
 
-    def init_progress_counter_storage() -> ProgressCounterRedisStorage:
-        return ProgressCounterRedisStorage(
-            client=redis_client,
+    def init_progress_counter_storage() -> ProgressCounterFileStorage:
+        return ProgressCounterFileStorage(
+            path=config.path_to_progress_counter,
         )
     
-    def init_skiped_messages_ids_storage() -> SkipedMessageIdsRedisStorage:
-        return SkipedMessageIdsRedisStorage(
-            client=redis_client,
-        )
-
     #register storages
     container.register(
         ProgressCounterStorage,
         factory=init_progress_counter_storage,
-        scope=Scope.singleton
-    )
-    container.register(
-        SkipedMessageIdsStorage,
-        factory=init_skiped_messages_ids_storage,
         scope=Scope.singleton
     )
 
@@ -111,8 +112,8 @@ def _init_container() -> Container:
         return MessageModerationService(
             messages_repo=container.resolve(ABCMessagesRepository),
             ignored_messages_repo=container.resolve(ABCIgnoredMessagesRepository),
+            skiped_messages_repo=container.resolve(ABCSkipedMessagesRepository),
             progress_counter_storage=container.resolve(ProgressCounterStorage),
-            skiped_message_ids_storage=container.resolve(SkipedMessageIdsStorage),
             report_proxy=container.resolve(ABCReportProxy),
             num_records_per_req=config.num_records_per_req,
             num_repetitions_for_report=config.num_repetitions_for_report

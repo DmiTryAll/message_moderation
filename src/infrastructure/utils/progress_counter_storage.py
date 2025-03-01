@@ -1,20 +1,20 @@
 from dataclasses import dataclass
-
-from redis.asyncio import Redis
+from pathlib import Path
 
 from domain.utils.progress_counter_storage import ProgressCounterStorage
 
 
 @dataclass
-class ProgressCounterRedisStorage(ProgressCounterStorage):
-    client: Redis
-    key: str = "progress_counter"
+class ProgressCounterFileStorage(ProgressCounterStorage):
+    path: Path
 
     async def get(self) -> int:
-        result: bytes = await self.client.get(self.key)
-        if not result:
-            return 0
-        return int(result.decode())
+        try:
+            result = self.path.read_text()
+        except FileNotFoundError:
+            result = 0
+        return int(result)
 
     async def set(self, value: int) -> None:
-        await self.client.set(self.key, value)
+        with open(self.path, "w") as f:
+            f.write(str(value))

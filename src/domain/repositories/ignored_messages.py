@@ -9,7 +9,7 @@ class ABCIgnoredMessagesRepository(ABC):
     async def check_exists(self, text: str) -> bool:
         ...
     
-    async def save(self, ignored_message: IgnoredMessage) -> str:
+    async def save(self, ignored_message: IgnoredMessage) -> int:
         ...
     
     async def delete(self, text: str) -> None:

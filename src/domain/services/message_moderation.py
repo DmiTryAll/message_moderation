@@ -5,8 +5,10 @@ from domain.exceptions.service import IgnoredMessageExistException
 from domain.repositories.ignored_messages import ABCIgnoredMessagesRepository
 from domain.repositories.messages import ABCMessagesRepository
 from domain.entity.ignored_message import IgnoredMessage
+from domain.entity.message import Message
+from domain.entity.skiped_message import SkipedMessage
+from domain.repositories.skiped_messages import ABCSkipedMessagesRepository
 from domain.utils.progress_counter_storage import ProgressCounterStorage
-from domain.utils.skiped_message_ids_storage import SkipedMessageIdsStorage
 from infrastructure.proxy.report_proxy import ABCReportProxy
 
 
@@ -14,8 +16,8 @@ from infrastructure.proxy.report_proxy import ABCReportProxy
 class MessageModerationService:
     messages_repo: ABCMessagesRepository
     ignored_messages_repo: ABCIgnoredMessagesRepository
+    skiped_messages_repo: ABCSkipedMessagesRepository
     progress_counter_storage: ProgressCounterStorage
-    skiped_message_ids_storage: SkipedMessageIdsStorage
     report_proxy: ABCReportProxy
     num_records_per_req: int
     num_repetitions_for_report: int
@@ -45,7 +47,7 @@ class MessageModerationService:
             if await self.ignored_messages_repo.check_exists(message.text.lower()):
                 continue
 
-            if await self.skiped_message_ids_storage.is_exist(message.id):
+            if await self.skiped_messages_repo.check_exist(message.id):
                 continue
             
             repeated_messages = await self.messages_repo.get_by_text_and_owner_id(
@@ -53,16 +55,16 @@ class MessageModerationService:
                 owner_id=message.owner_id
             )
 
-            filter_repeated_messages = []
+            filter_repeated_messages: list[Message] = []
             for repeated_message in repeated_messages:
-                if not await self.skiped_message_ids_storage.is_exist(repeated_message.id):
+                if not await self.skiped_messages_repo.check_exist(repeated_message.id):
                     filter_repeated_messages.append(repeated_message)
 
             if len(filter_repeated_messages) < self.num_repetitions_for_report:
                 continue
             
-            repeated_message_ids = [m.id for m in filter_repeated_messages]
-            await self.skiped_message_ids_storage.add(repeated_message_ids)
+            repeated_message_ids = [SkipedMessage(id=m.id) for m in filter_repeated_messages]
+            await self.skiped_messages_repo.add(repeated_message_ids)
 
             if not await self.report_proxy.report(message.text, message.owner_id):
                 break
