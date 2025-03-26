@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from domain.exceptions.service import IgnoredMessageExistException
+from domain.repositories.chats import ABCChatsRepository
 from domain.repositories.ignored_messages import ABCIgnoredMessagesRepository
-from domain.repositories.messages import ABCMessagesRepository
 from domain.entity.ignored_message import IgnoredMessage
 from domain.entity.message import Message
 from domain.entity.skiped_message import SkipedMessage
@@ -14,7 +14,7 @@ from infrastructure.proxy.report_proxy import ABCReportProxy
 
 @dataclass
 class MessageModerationService:
-    messages_repo: ABCMessagesRepository
+    chats_repo: ABCChatsRepository
     ignored_messages_repo: ABCIgnoredMessagesRepository
     skiped_messages_repo: ABCSkipedMessagesRepository
     progress_counter_storage: ProgressCounterStorage
@@ -38,38 +38,37 @@ class MessageModerationService:
     async def moderate(self) -> None:
         progress_counter = await self.progress_counter_storage.get()
 
-        messages = await self.messages_repo.get_all(
+        messages = await self.chats_repo.get_messages_ordered_by_created_at(
             offset=progress_counter,
             limit=self.num_records_per_req
         )
 
-        for indx, message in enumerate(messages):
-            if await self.ignored_messages_repo.check_exists(message.text.lower()):
+        for indx, message in enumerate(messages, 1):
+            if await self.ignored_messages_repo.check_exists(message.text.lower().strip()):
                 continue
 
-            if await self.skiped_messages_repo.check_exist(message.id):
+            if await self.skiped_messages_repo.check_exist(message.message_id):
                 continue
             
-            repeated_messages = await self.messages_repo.get_by_text_and_owner_id(
+            repeated_messages = await self.chats_repo.get_messages_by_text_and_owner_id(
                 text=message.text,
-                owner_id=message.owner_id
+                owner_card_id=message.owner_card_id
             )
 
             filter_repeated_messages: list[Message] = []
             for repeated_message in repeated_messages:
-                if not await self.skiped_messages_repo.check_exist(repeated_message.id):
+                if not await self.skiped_messages_repo.check_exist(repeated_message.message_id):
                     filter_repeated_messages.append(repeated_message)
 
-            if len(filter_repeated_messages) < self.num_repetitions_for_report:
+            if len(repeated_messages) < self.num_repetitions_for_report:
                 continue
             
-            repeated_message_ids = [SkipedMessage(id=m.id) for m in filter_repeated_messages]
+            repeated_message_ids = [SkipedMessage(id=m.message_id) for m in filter_repeated_messages]
             await self.skiped_messages_repo.add(repeated_message_ids)
 
-            if not await self.report_proxy.report(message.text, message.owner_id):
+            if not await self.report_proxy.report(message.text, message.owner_card_id):
                 break
 
         await self.progress_counter_storage.set(
             progress_counter + indx
         )
-

@@ -23,4 +23,4 @@ class Config(BaseSettings):
 
     path_to_progress_counter: Path = Path("progress_counter.txt")
     num_records_per_req: int = 50
-    num_repetitions_for_report: int = 2
+    num_repetitions_for_report: int = 3

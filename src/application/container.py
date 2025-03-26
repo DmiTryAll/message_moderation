@@ -6,13 +6,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from punq import Container, Scope
 
 from domain.repositories.ignored_messages import ABCIgnoredMessagesRepository
-from domain.repositories.messages import ABCMessagesRepository
+from domain.repositories.chats import ABCChatsRepository
 from domain.repositories.skiped_messages import ABCSkipedMessagesRepository
 from domain.services.message_moderation import MessageModerationService
 from domain.utils.progress_counter_storage import ProgressCounterStorage
 
 from infrastructure.proxy.report_proxy import ABCReportProxy, ReportProxy
-from infrastructure.repositories.mongo.messages import MongoDBMessagesRepository
+from infrastructure.repositories.mongo.chats import MongoDBChatsRepository
 from infrastructure.repositories.postgres.database import Database
 from infrastructure.repositories.postgres.ignored_messages import PosgresIgnoredMessagesRepository
 from infrastructure.repositories.postgres.skiped_messages import PosgresSkipedMessagesRepository
@@ -49,8 +49,8 @@ def _init_container() -> Container:
     database = container.resolve(Database)
     mongodb_client = container.resolve(AsyncIOMotorClient)
 
-    def init_messages_mongodb_repository() -> MongoDBMessagesRepository:
-        return MongoDBMessagesRepository(
+    def init_chats_mongodb_repository() -> MongoDBChatsRepository:
+        return MongoDBChatsRepository(
             mongodb_client=mongodb_client,
             mongodb_db_name=config.mongodb.database,
             mongodb_collection_name=config.mongodb.messages_collection,
@@ -68,8 +68,8 @@ def _init_container() -> Container:
 
     # register repositiries
     container.register(
-        ABCMessagesRepository,
-        factory=init_messages_mongodb_repository,
+        ABCChatsRepository,
+        factory=init_chats_mongodb_repository,
         scope=Scope.singleton
     )
     container.register(
@@ -110,7 +110,7 @@ def _init_container() -> Container:
 
     def init_message_moderation_service() -> MessageModerationService:
         return MessageModerationService(
-            messages_repo=container.resolve(ABCMessagesRepository),
+            chats_repo=container.resolve(ABCChatsRepository),
             ignored_messages_repo=container.resolve(ABCIgnoredMessagesRepository),
             skiped_messages_repo=container.resolve(ABCSkipedMessagesRepository),
             progress_counter_storage=container.resolve(ProgressCounterStorage),

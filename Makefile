@@ -17,6 +17,14 @@ app:
 app-down:
 	${DC} -f ${APP} ${ENV} down
 
+.PHONY: postgres
+postgres:
+	${DC} -f ${POSTGRESQL} ${ENV} up -d --build
+
+.PHONY: postgres-down
+postgres-down:
+	${DC} -f ${POSTGRESQL} ${ENV} down
+
 .PHONY: storages
 storages:
 	${DC} -f ${MONGO} -f ${POSTGRESQL} -f ${REDIS} ${ENV} up -d --build
