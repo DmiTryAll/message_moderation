@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 from typing import Iterable
 
 from domain.exceptions.service import IgnoredMessageExistException
@@ -37,6 +38,7 @@ class MessageModerationService:
     
     async def moderate(self) -> None:
         progress_counter = await self.progress_counter_storage.get()
+        regex = re.compile("(\+?\d[\( -]?\d{3}[\) -]?\d{3}[ -]?\d{2}[ -]?\d{2})|(@\w+)|(т(г|еле(га|жка|гра[м]{1,2})))")
 
         messages = await self.chats_repo.get_messages_ordered_by_created_at(
             offset=progress_counter,
@@ -60,7 +62,9 @@ class MessageModerationService:
                 if not await self.skiped_messages_repo.check_exist(repeated_message.message_id):
                     filter_repeated_messages.append(repeated_message)
 
-            if len(repeated_messages) < self.num_repetitions_for_report:
+            re_search_result = re.search(regex, message)
+
+            if (len(repeated_messages) < self.num_repetitions_for_report) and not re_search_result:
                 continue
             
             repeated_message_ids = [SkipedMessage(id=m.message_id) for m in filter_repeated_messages]
