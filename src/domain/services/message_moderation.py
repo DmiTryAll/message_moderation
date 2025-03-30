@@ -38,7 +38,12 @@ class MessageModerationService:
     
     async def moderate(self) -> None:
         progress_counter = await self.progress_counter_storage.get()
-        regex = re.compile("(\+?\d[\( -]?\d{3}[\) -]?\d{3}[ -]?\d{2}[ -]?\d{2})|(@\w+)|(т(г|еле(га|жка|гра[м]{1,2})))")
+        regex = re.compile(
+            "(\+?\d[\( -]?\d{3}[\) -]?\d{3}[ -]?\d{2}[ -]?\d{2})"
+            "|(@\w+)"
+            "|(т(г|еле(га|жка|гра[м]{1,2})))|(t(g|elegra[m]{1,2}))"
+            "|(в(т|отс(а[п]{1,2})?))|(w(t|hatsa[p]{1,2}))"
+        )
 
         messages = await self.chats_repo.get_messages_ordered_by_created_at(
             offset=progress_counter,
@@ -46,7 +51,9 @@ class MessageModerationService:
         )
 
         for indx, message in enumerate(messages, 1):
-            if await self.ignored_messages_repo.check_exists(message.text.lower().strip()):
+            text_message = message.text.lower()
+
+            if await self.ignored_messages_repo.check_exists(text_message.strip()):
                 continue
 
             if await self.skiped_messages_repo.check_exist(message.message_id):
@@ -62,7 +69,7 @@ class MessageModerationService:
                 if not await self.skiped_messages_repo.check_exist(repeated_message.message_id):
                     filter_repeated_messages.append(repeated_message)
 
-            re_search_result = re.search(regex, message)
+            re_search_result = re.search(regex, text_message)
 
             if (len(repeated_messages) < self.num_repetitions_for_report) and not re_search_result:
                 continue
