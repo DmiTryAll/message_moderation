@@ -1,11 +1,13 @@
 import asyncio
-
-from application.container import init_container
-from domain.services.message_moderation import MessageModerationService
-from infrastructure.repositories.postgres.database import Database
+from pathlib import Path
+import sys
 
 
 async def main():
+    from application.container import init_container
+    from domain.services.message_moderation import MessageModerationService
+    from infrastructure.repositories.postgres.database import Database
+
     container = init_container()
 
     database: Database = container.resolve(Database)
@@ -21,4 +23,5 @@ async def main():
 
 
 if "__main__" == __name__:
+    sys.path.append(str(Path(__file__).parent.parent))
     asyncio.run(main())

@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from settings.mongodb import MongoDBConfig
 from settings.postgres import PostgresConfig
-# from settings.redis import RedisConfig
 
 
 class Config(BaseSettings):
@@ -15,7 +14,6 @@ class Config(BaseSettings):
     )
 
     mongodb: MongoDBConfig
-    # redis: RedisConfig
     postgres: PostgresConfig
 
     telegram_token: str

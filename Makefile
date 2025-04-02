@@ -9,13 +9,9 @@ POSTGRESQL = docker_compose/postgresql.yaml
 ENV = --env-file .env
 
 
-.PHONY: app
-app:
-	${DC} -f ${APP} ${ENV} up -d --build
-
-.PHONY: app-down
-app-down:
-	${DC} -f ${APP} ${ENV} down
+.PHONY: run
+run:
+	python src/application/main.py
 
 .PHONY: postgres
 postgres:
@@ -32,11 +28,3 @@ storages:
 .PHONY: storages-down
 storages-down:
 	${DC} -f ${MONGO} -f ${POSTGRESQL} -f ${REDIS} ${ENV} down
-
-.PHONY: all
-all:
-	${DC} -f ${APP} -f ${MONGO} -f ${REDIS} ${ENV} up -d --build
-
-.PHONY: all-down
-all-down:
-	${DC} -f ${APP} -f ${MONGO} -f ${REDIS} ${ENV} down

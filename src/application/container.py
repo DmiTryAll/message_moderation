@@ -1,7 +1,6 @@
 from functools import lru_cache
 
 from aiogram import Bot
-from aiojobs import Scheduler
 from motor.motor_asyncio import AsyncIOMotorClient
 from punq import Container, Scope
 
@@ -124,7 +123,5 @@ def _init_container() -> Container:
         MessageModerationService,
         factory=init_message_moderation_service,
     )
-
-    container.register(Scheduler, factory=lambda: Scheduler(), scope=Scope.singleton)
 
     return container
